@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>心灵树洞 - 心理健康聊天助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+    .message-appear { animation: fadeIn 0.35s ease-out; }
+    .dot { animation: bounce 1.4s infinite ease-in-out both; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+  </style>
+</head>
+<body class="min-h-screen bg-[#FDFCF8] text-[#2F3E46] font-['PingFang_SC','HarmonyOS_Sans','Microsoft_YaHei',sans-serif] flex items-center justify-center px-4 py-8">
+  <div class="w-full max-w-4xl">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-semibold">心灵树洞</h1>
+      <p class="text-sm text-[#52796F] mt-1">温暖、专业的心理支持对话空间</p>
+    </div>
+
+    <div class="bg-white/70 backdrop-blur-xl shadow-2xl rounded-[20px] border border-white/60 overflow-hidden">
+      <div class="p-6 border-b border-white/70">
+        <p class="text-sm text-[#52796F]">与“树洞”聊聊你的心情，慢慢来，我们在这里陪你。</p>
+      </div>
+
+      <div id="chatArea" class="h-[480px] overflow-y-auto px-6 py-4 space-y-4"></div>
+
+      <div class="p-4 border-t border-white/70 bg-white/60">
+        <div class="flex items-center gap-3">
+          <textarea id="userInput" rows="1" placeholder="写下你的感受..." class="flex-1 resize-none rounded-2xl border border-[#C7D2C5] px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#84A98C]/60 bg-white/80 text-sm"></textarea>
+          <button id="sendBtn" class="px-5 py-3 rounded-2xl bg-[#84A98C] text-white font-medium hover:bg-[#6F8F78] transition">发送</button>
+        </div>
+        <p class="mt-2 text-xs text-[#8A9BA3]">提示：对话内容仅用于演示，请勿输入真实隐私信息。</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // TODO: 替换为你的 DeepSeek API Key
+    const API_KEY = 'YOUR_DEEPSEEK_API_KEY_HERE';
+    const API_URL = 'https://api.deepseek.com/chat/completions';
+    const SYSTEM_PROMPT = "你是一位共情能力极强、专业且温暖的心理咨询师。你的名字叫'树洞'。请用温暖、治愈、非评判性的中文与用户交流。多倾听，多用开放式提问引导用户，运用认知行为疗法（CBT）的技巧安抚情绪。回复不要太长，保持像朋友聊天的节奏。";
+
+    const chatArea = document.getElementById('chatArea');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+
+    const escapeHtml = (text) => text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    const parseMarkdown = (text) => {
+      let html = escapeHtml(text);
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\n\s*[-*]\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
+      html = html.replace(/(<li>.*?<\/li>)/gs, '<ul class="list-disc list-inside space-y-1">$1</ul>');
+      html = html.replace(/\n/g, '<br />');
+      return html;
+    };
+
+    const scrollToBottom = () => {
+      chatArea.scrollTop = chatArea.scrollHeight;
+    };
+
+    const addMessage = (content, role = 'assistant') => {
+      const wrapper = document.createElement('div');
+      wrapper.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} message-appear`;
+
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow ${role === 'user'
+        ? 'bg-[#84A98C] text-white rounded-br-md'
+        : 'bg-white/80 text-[#2F3E46] rounded-bl-md border border-white/70'}`;
+
+      bubble.innerHTML = role === 'assistant' ? parseMarkdown(content) : escapeHtml(content).replace(/\n/g, '<br />');
+      wrapper.appendChild(bubble);
+      chatArea.appendChild(wrapper);
+      scrollToBottom();
+    };
+
+    const addThinking = () => {
+      const wrapper = document.createElement('div');
+      wrapper.id = 'thinking';
+      wrapper.className = 'flex justify-start';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'px-4 py-3 rounded-2xl bg-white/80 border border-white/70 shadow text-sm flex items-center gap-2';
+      bubble.innerHTML = `
+        <span class="text-[#52796F]">思考中</span>
+        <span class="flex gap-1">
+          <span class="dot w-2 h-2 bg-[#84A98C] rounded-full"></span>
+          <span class="dot w-2 h-2 bg-[#84A98C] rounded-full"></span>
+          <span class="dot w-2 h-2 bg-[#84A98C] rounded-full"></span>
+        </span>
+      `;
+
+      wrapper.appendChild(bubble);
+      chatArea.appendChild(wrapper);
+      scrollToBottom();
+    };
+
+    const removeThinking = () => {
+      const thinking = document.getElementById('thinking');
+      if (thinking) thinking.remove();
+    };
+
+    const sendMessage = async () => {
+      const content = userInput.value.trim();
+      if (!content) return;
+
+      addMessage(content, 'user');
+      messages.push({ role: 'user', content });
+      userInput.value = '';
+      userInput.style.height = 'auto';
+
+      addThinking();
+      sendBtn.disabled = true;
+      sendBtn.classList.add('opacity-70', 'cursor-not-allowed');
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages,
+            temperature: 0.7,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`请求失败，状态码 ${response.status}`);
+        }
+
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content?.trim();
+
+        if (!reply) {
+          throw new Error('返回内容为空');
+        }
+
+        messages.push({ role: 'assistant', content: reply });
+        addMessage(reply, 'assistant');
+      } catch (error) {
+        const gentleError = '抱歉，我现在有点忙碌，暂时无法回应。你可以稍后再试，我一直在这里。';
+        addMessage(gentleError, 'assistant');
+      } finally {
+        removeThinking();
+        sendBtn.disabled = false;
+        sendBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+      }
+    };
+
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+
+    userInput.addEventListener('input', () => {
+      userInput.style.height = 'auto';
+      userInput.style.height = `${userInput.scrollHeight}px`;
+    });
+
+    addMessage('你好，我是树洞。今天过得怎么样？愿意和我分享吗？', 'assistant');
+  </script>
+</body>
+</html>
